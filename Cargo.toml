@@ -1,0 +1,53 @@
+# meow-applet-leitura — o applet do modo de leitura na topbar do COSMIC.
+#
+# O `rev` DO libcosmic É PINADO AQUI, E O `Cargo.lock` VAI NO REPOSITÓRIO
+#   O applet de mídia (src/applets/now-playing) herda o lock do upstream dele e
+#   por isso pode apontar o libcosmic para o git sem `rev`. Este crate é NOSSO:
+#   não existe upstream de onde herdar lock, então quem segura a versão somos
+#   nós, em dois lugares que se conferem — o `rev` abaixo e o `Cargo.lock` ao
+#   lado. Sem os dois, `cargo build` de amanhã pegaria outro commit do libcosmic
+#   e a falha apareceria como erro de compilação num dia em que ninguém mexeu em
+#   nada.
+#
+#   MEDIDO em 30/08/2026: há CINCO checkouts distintos de libcosmic em
+#   ~/.cargo/git/checkouts/libcosmic-41009aea1d72760b (1d7113a, 1f6dc99, 2a73fbc,
+#   511384f, 8fa6a01), todos com version = "1.0.0". A versão do Cargo.toml deles
+#   não distingue nada; só o commit distingue.
+#
+# POR QUE ESTE rev, E NÃO O MAIS NOVO
+#   `1f6dc99` é EXATAMENTE o que o applet de mídia compilou nesta máquina (ver o
+#   campo LIBCOSMIC do src/applets/now-playing/PINO). Escolher um rev já provado
+#   aqui troca "talvez compile" por "compilou". Os idiomas de popup deste arquivo
+#   (`cosmic::surface::action::app_popup`) foram copiados do window.rs daquele
+#   applet, que é código que já roda na barra dela.
+#
+# AS FEATURES SÃO AS MESMAS TRÊS DO APPLET DE MÍDIA, E ISSO É DE PROPÓSITO
+#   `default-features = false` mais `a11y`, `applet` e `wayland`. Em especial
+#   `dbus-config` fica DESLIGADO: com ela, o `watch_config` do libcosmic desvia
+#   para o cosmic-settings-daemon em vez do vigia de arquivo, e as nossas chaves
+#   `leitura_*` não são chaves que aquele daemon conheça. O vigia de arquivo vê
+#   qualquer chave do diretório — que é o que o agendador (scripts/leitura.sh)
+#   escreve às 18:00.
+[package]
+name = "meow-applet-leitura"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0"
+rust-version = "1.93"
+publish = false
+
+[[bin]]
+name = "meow-applet-leitura"
+path = "src/main.rs"
+
+[dependencies.libcosmic]
+git = "https://github.com/pop-os/libcosmic.git"
+rev = "1f6dc991eaa5115a09be2505cc8a323e5b2b0bff"
+default-features = false
+features = ["a11y", "applet", "wayland"]
+
+# Um binário de applet que só desenha não precisa de símbolo nenhum, e o
+# `midia_build.sh` já roda `strip` depois de instalar. Aqui o `strip = true` faz
+# o mesmo de graça, dentro do próprio cargo.
+[profile.release]
+strip = true
