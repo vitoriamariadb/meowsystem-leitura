@@ -40,6 +40,20 @@ publish = false
 name = "meow-applet-leitura"
 path = "src/main.rs"
 
+# O `jiff` JÁ ESTAVA NESTA ÁRVORE — declará-lo aqui não baixa um byte
+#   Ele entra pelo libcosmic, e o `Cargo.lock` ao lado o registra em 0.2.35 desde
+#   antes de existir uma linha nossa que o use. O que muda com esta seção é só a
+#   ARESTA: o `main.rs` passa a poder dizer `jiff::` sem depender de reexport de
+#   ninguém. A versão é a MESMA do lock, de propósito — pedir `"0.2"` deixaria o
+#   resolvedor livre para subir num dia em que ninguém mexeu em nada, que é
+#   exatamente o que o `--locked` do `leitura_build.sh` existe para impedir.
+#
+# PARA QUE ELE SERVE, EM UMA LINHA: `Zoned::now()`, o único jeito honesto de
+# saber a hora LOCAL — e a hora local é o que decide se o ícone da barra é o sol
+# ou a lua. `SystemTime` daria UTC, e nesta máquina isso são três horas de erro.
+[dependencies]
+jiff = "0.2.35"
+
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
 rev = "1f6dc991eaa5115a09be2505cc8a323e5b2b0bff"

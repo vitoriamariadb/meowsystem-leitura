@@ -86,7 +86,8 @@ use cosmic::cosmic_config::cosmic_config_derive::CosmicConfigEntry;
 use cosmic::cosmic_config::{self, Config, ConfigGet, ConfigSet, CosmicConfigEntry};
 use cosmic::iced::{Alignment, Length, Limits, Subscription, window, window::Id};
 use cosmic::surface::action::{app_popup, destroy_popup};
-use cosmic::widget::{Column, Row, Slider, divider, spin_button, text, toggler};
+use cosmic::theme;
+use cosmic::widget::{Column, Row, Slider, container, divider, icon, spin_button, text, toggler};
 use cosmic::{Action, Element, Task};
 
 /// O `app_id` do applet. É o basename do `.desktop` que o `cosmic-panel` procura
@@ -106,6 +107,50 @@ const NS_COMPOSITOR_V: u64 = 1;
 /// logo no logout, que é justamente quando ela vai reiniciar este processo.
 const NS_ESTADO: &str = "com.meowsystem.AppletLeitura";
 const NS_ESTADO_V: u64 = 1;
+
+// ============================================================================
+// OS QUATRO ÍCONES AUTORAIS, DENTRO DO BINÁRIO — 31/08/2026
+// ============================================================================
+//
+// O QUE ELA PEDIU
+//   "faltou inserir os svgs na guia que abre e fazer o icon do applet mudar
+//   conforme o horario do dia."
+//
+// QUAIS SÃO, E POR QUE ESTES QUATRO
+//   São os do conjunto "modo de leitura" da folha de 29/08/2026
+//   (docs/pesquisas/2026-08-29-modo-leitura.html, aba "Os candidatos do modo de
+//   leitura"). `r2` e `s3` são o PAR que ela viu e aprovou lá — "a lua sobre o
+//   texto" e "o sol no horizonte", desenhados com a mesma massa (forma grande em
+//   cima, duas linhas embaixo) justamente para que a troca não pule na barra.
+//   `r1` e `r6` estavam marcados na mesma folha como as outras duas opções de
+//   pé; aqui eles ganham lugar próprio, ao lado dos rótulos que nomeiam.
+//
+// POR QUE `include_bytes!` E NÃO O TEMA DE ÍCONES
+//   A folha previa instalá-los em `MeowSystem-Icons/scalable/status/`. Esse
+//   diretório tem DONO — o `scripts/icones_sistema.sh`, que o varre contra o
+//   `assets/icones/sistema.map` e REMOVE ÓRFÃO (o cabeçalho dele diz isso em voz alta).
+//   Quatro arquivos nossos ali seriam apagados na próxima passada daquele
+//   script, e o applet ficaria sem ícone sem ninguém ter mexido nele.
+//
+//   Embutidos no binário eles não dependem de tema, não dependem do cache de
+//   ícones do lançador (que já enganou este projeto uma vez) e não podem
+//   divergir do código que os desenha: o SVG e o `view()` que o usa entram no
+//   mesmo build. O custo é 2 KB de binário para os quatro.
+//
+// `symbolic(true)` É O QUE FAZ A COR SER A DO TEMA
+//   Os arquivos trazem `stroke="#cdd6f4"` (o texto do Mocha), mas nada disso
+//   chega à tela: com `symbolic`, o libcosmic descarta a cor do arquivo e
+//   repinta com o `on` do fundo — que é o mesmo caminho de todo ícone da barra
+//   dela. É por isso que o mesmo arquivo serve tema claro e escuro.
+const ARTE_LUA: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/r2.svg");
+const ARTE_SOL: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/s3.svg");
+const ARTE_LIVRO: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/r1.svg");
+const ARTE_HALO: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/r6.svg");
+
+/// O tamanho dos ícones que acompanham os rótulos DENTRO do popup. O da barra
+/// não passa por aqui: quem o dimensiona é o `suggested_size` do libcosmic, que
+/// sabe a altura da topbar dela e a escala da tela.
+const ICONE_ROTULO: u16 = 16;
 
 /// 6500K é o neutro e o topo da faixa; 1000K é o fundo da tabela WHITEPOINTS.
 const NEUTRO: u32 = 6500;
@@ -331,6 +376,24 @@ fn ponta_do_horario(bruto: &str, padrao: &str) -> i32 {
         .unwrap_or(0)
 }
 
+/// Que horas são, em minutos desde a meia-noite, NO FUSO DELA.
+///
+/// O `jiff` já está na árvore desta compilação — ele entra pelo libcosmic, e o
+/// `Cargo.lock` ao lado o registra desde antes desta função existir. Declará-lo
+/// como dependência direta não baixa um byte novo; só torna explícito o que já
+/// estava sendo compilado.
+///
+/// POR QUE NÃO `SystemTime::now()` E UMA CONTA
+///   `SystemTime` é UTC. A janela do agendamento é escrita em hora LOCAL — ela
+///   arrasta "das 18:00 às 07:00" olhando o relógio da barra —, e nesta máquina
+///   isso são três horas de diferença. Sem fuso, o ícone viraria lua às 15:00.
+///   `Zoned::now()` lê o fuso do sistema, que é o mesmo que o `date +%H:%M` do
+///   `scripts/leitura.sh` usa do outro lado.
+fn agora_em_minutos() -> i32 {
+    let agora = jiff::Zoned::now();
+    i32::from(agora.hour()) * 60 + i32::from(agora.minute())
+}
+
 fn hhmm_de_minutos(v: i32) -> String {
     let v = v.rem_euclid(1440);
     format!("{:02}:{:02}", v / 60, v % 60)
@@ -420,6 +483,10 @@ enum Message {
     /// `cosmic::Application` tem de ser `Clone`. Os erros que vinham no
     /// `Update` são consumidos onde nascem — no `map` da assinatura.
     DiscoMudou(Chaves),
+    /// O relógio bateu. Não carrega nada e não escreve nada: existe só para o
+    /// `view()` rodar de novo e o ícone da barra trocar de sol para lua na hora
+    /// certa. Ver o `subscription()`.
+    Minuto,
 }
 
 impl AppletLeitura {
@@ -428,6 +495,50 @@ impl AppletLeitura {
     /// um interruptor que dissesse "desligado" com a textura em 40% mentiria.
     fn ligado(&self) -> bool {
         self.chaves.leitura_temperatura != 0 || self.chaves.leitura_textura > 0.0
+    }
+
+    /// É noite AGORA, pela janela que ELA configurou?
+    ///
+    /// A REGRA É COPIADA, LINHA POR LINHA, DO AGENDADOR
+    ///   O `BEGIN` do `_leitura_alvo_agora` (scripts/leitura.sh) e o `e_noite()`
+    ///   do `wallpaper.sh` decidem assim, e a igualdade entre os três é o que
+    ///   impede esta máquina de ter duas noites:
+    ///
+    ///       ini == fim  ->  é noite o dia inteiro
+    ///       ini >  fim  ->  a janela atravessa a meia-noite
+    ///       ini <  fim  ->  janela normal, dentro do mesmo dia
+    ///
+    /// A JANELA VALE MESMO COM O "AGENDAR" DESLIGADO, E ISSO É DE PROPÓSITO
+    ///   Ela pediu "o icon do applet mudar conforme o HORÁRIO DO DIA" — não
+    ///   "conforme o interruptor". Com o Agendar desligado o relógio não mexe na
+    ///   tela, mas continua sendo noite lá fora, e o desenho na barra continua
+    ///   dizendo a verdade sobre a hora. Quem conta o estado da TELA é o
+    ///   interruptor no topo do popup, que fica a um clique de distância.
+    fn e_noite(&self) -> bool {
+        let ini = ponta_do_horario(&self.chaves.leitura_hora_inicio, PADRAO_INICIO);
+        let fim = ponta_do_horario(&self.chaves.leitura_hora_fim, PADRAO_FIM);
+        let agora = agora_em_minutos();
+        if ini == fim {
+            true
+        } else if ini > fim {
+            agora >= ini || agora < fim
+        } else {
+            agora >= ini && agora < fim
+        }
+    }
+
+    /// O desenho que vai para a topbar: a lua de noite, o sol de dia.
+    fn arte_da_barra(&self) -> &'static [u8] {
+        if self.e_noite() { ARTE_LUA } else { ARTE_SOL }
+    }
+
+    /// Um dos quatro desenhos, no tamanho de rótulo, pronto para entrar numa
+    /// `Row`. `symbolic(true)` é o que joga fora a cor do arquivo e repinta com
+    /// a do tema — ver o bloco dos ícones lá em cima.
+    fn selo(arte: &'static [u8]) -> Element<'static, Message> {
+        icon::icon(icon::from_svg_bytes(arte).symbolic(true))
+            .size(ICONE_ROTULO)
+            .into()
     }
 
     fn grava_temperatura(&mut self, v: u32) {
@@ -672,6 +783,9 @@ impl cosmic::Application for AppletLeitura {
                 self.arrastando = false;
                 self.chaves = chaves;
             }
+            // Nada a fazer: o retorno desta função já pede um redesenho, e é o
+            // redesenho que troca o sol pela lua. Ver o `subscription()`.
+            Message::Minuto => {}
         }
         Task::none()
     }
@@ -688,26 +802,52 @@ impl cosmic::Application for AppletLeitura {
         //   ele cai no vigia de ARQUIVO, que enxerga qualquer chave do
         //   diretório — inclusive as cinco que o cosmic-settings-daemon nunca
         //   ouviu falar.
-        self.core
-            .watch_config::<Chaves>(NS_COMPOSITOR)
-            .map(|atualizacao| {
-                for e in &atualizacao.errors {
-                    if !chave_apenas_ausente(e) {
-                        eprintln!("meow-applet-leitura: lendo o disco: {e}");
+        //
+        // E O SEGUNDO FIO É O RELÓGIO, DESDE 31/08/2026
+        //   O ícone da barra passou a contar a HORA (sol de dia, lua de noite),
+        //   e sem um tique ele só trocaria quando alguma OUTRA coisa acordasse o
+        //   applet. Na prática isso quase funcionaria — o `leitura.sh` escreve
+        //   nas chaves às 18:00 e o vigia acima acorda —, mas só com o "Agendar"
+        //   ligado: desligado, o desenho ficaria preso no sol até ela abrir o
+        //   popup. Um ícone que mente sobre a hora é pior do que um ícone fixo.
+        //
+        //   60 s é o passo, e o atraso máximo é ele mesmo: a virada aparece na
+        //   barra em menos de um minuto. É o mesmo período do
+        //   `meow-leitura.timer`, e por um motivo parecido — não existe evento
+        //   de "virou a hora" para assinar, então alguém tem de perguntar.
+        //   `Message::Minuto` não lê disco, não escreve disco e não aloca: ele
+        //   existe para o `view()` rodar.
+        Subscription::batch([
+            self.core
+                .watch_config::<Chaves>(NS_COMPOSITOR)
+                .map(|atualizacao| {
+                    for e in &atualizacao.errors {
+                        if !chave_apenas_ausente(e) {
+                            eprintln!("meow-applet-leitura: lendo o disco: {e}");
+                        }
                     }
-                }
-                Message::DiscoMudou(atualizacao.config)
-            })
+                    Message::DiscoMudou(atualizacao.config)
+                }),
+            cosmic::iced::time::every(std::time::Duration::from_secs(60)).map(|_| Message::Minuto),
+        ])
     }
 
     fn view(&self) -> Element<'_, Message> {
-        // `night-light-symbolic` existe no Papirus E no Adwaita desta máquina
-        // (conferido em 30/08/2026), então o ícone não some se ela trocar de
-        // tema de ícones. Um ícone autoral entraria aqui, mas escolher o
-        // desenho é gosto dela, e gosto não se decide num commit de frente.
+        // ERA `night-light-symbolic`, UM ÍCONE DE TEMA, ATÉ 31/08/2026
+        //   O comentário que estava aqui dizia que "um ícone autoral entraria
+        //   aqui, mas escolher o desenho é gosto dela, e gosto não se decide num
+        //   commit de frente". Estava certo, e o gosto foi decidido: ela viu a
+        //   folha de 29/08 e aprovou o par sol/lua (`s3` e `r2`), e em 31/08
+        //   pediu que o desenho seguisse a hora. É esse par que está aqui.
+        //
+        //   `icon_button_from_handle` e não `icon_button`: o segundo só sabe
+        //   procurar por NOME no tema de ícones, e estes dois não moram em tema
+        //   nenhum — moram dentro do binário (ver ARTE_LUA / ARTE_SOL). O
+        //   dimensionamento é idêntico: os dois desembocam na mesma função, que
+        //   pergunta ao libcosmic a altura da barra dela.
         self.core
             .applet
-            .icon_button("night-light-symbolic")
+            .icon_button_from_handle(icon::from_svg_bytes(self.arte_da_barra()).symbolic(true))
             .on_press_down(Message::AbreFecha)
             .into()
     }
@@ -715,12 +855,23 @@ impl cosmic::Application for AppletLeitura {
     fn view_window(&self, _id: Id) -> Element<'_, Message> {
         let ligado = self.ligado();
 
+        // O SELO DO INTERRUPTOR É O MESMO DA BARRA, E ISSO É O DESENHO INTEIRO
+        //   Quem abre o popup viu um ícone na barra um instante antes. Repetir
+        //   exatamente aquele desenho na primeira linha é o que amarra as duas
+        //   coisas: "este popup é daquele ícone". Se fosse outro qualquer, a
+        //   primeira linha do popup seria uma segunda pergunta.
         let interruptor = padded_control(
-            toggler(ligado)
-                .on_toggle(Message::Ligar)
-                .label("Modo de leitura".to_string())
-                .text_size(14)
-                .width(Length::Fill),
+            Row::new()
+                .push(Self::selo(self.arte_da_barra()))
+                .push(
+                    toggler(ligado)
+                        .on_toggle(Message::Ligar)
+                        .label("Modo De Leitura".to_string())
+                        .text_size(14)
+                        .width(Length::Fill),
+                )
+                .spacing(8)
+                .align_y(Alignment::Center),
         );
 
         // Com a chave em 0 o slider descansa no TOPO (6500K), que é onde
@@ -732,16 +883,22 @@ impl cosmic::Application for AppletLeitura {
             self.chaves.leitura_temperatura.clamp(PISO, NEUTRO)
         };
         let rotulo_k = if self.chaves.leitura_temperatura == 0 {
-            "desligado".to_string()
+            "Desligado".to_string()
         } else {
             format!("{k} K")
         };
         let temperatura = padded_control(
             Column::new()
                 .push(
+                    // O SOL fica na TEMPERATURA porque o slider inteiro é sobre
+                    // ele: o topo da faixa (6500 K) é a luz do dia, e cada passo
+                    // para baixo é sol se pondo. Ver o `rotulo_k`, que chama o
+                    // topo de "Desligado" pela mesma razão.
                     Row::new()
+                        .push(Self::selo(ARTE_SOL))
                         .push(text::body("Temperatura").width(Length::Fill))
                         .push(text::body(rotulo_k))
+                        .spacing(8)
                         .align_y(Alignment::Center),
                 )
                 .push(
@@ -772,26 +929,44 @@ impl cosmic::Application for AppletLeitura {
         let textura = padded_control(
             Column::new()
                 .push(
+                    // O LIVRO ABERTO na TEXTURA: o que este slider faz é a
+                    // página — faixa dinâmica comprimida, dessaturação e grão.
+                    // Era o `r1` da folha, "o mais seguro, lê em qualquer
+                    // tamanho"; o preço lá era ser genérico demais para a barra,
+                    // e aqui, com o rótulo ao lado, genérico é exatamente o
+                    // certo.
                     Row::new()
-                        .push(text::body("Textura de papel").width(Length::Fill))
+                        .push(Self::selo(ARTE_LIVRO))
+                        .push(text::body("Textura De Papel").width(Length::Fill))
                         .push(text::body(format!("{pct}%")))
+                        .spacing(8)
                         .align_y(Alignment::Center),
                 )
                 .push(
                     Slider::new(0u32..=100u32, pct, Message::Textura)
                         .step(PASSO_TEXTURA)
-                        .name("Textura de papel")
+                        .name("Textura De Papel")
                         .on_release(Message::Soltou),
                 )
                 .spacing(4),
         );
 
+        // O LIVRO COM HALO no AGENDAR: é o desenho da luz que se acende sozinha
+        // sobre a página, que é literalmente o que esta linha liga. Na folha ele
+        // perdia a 16 px, onde os três raios encostam na capa e viram coroa —
+        // e é por isso que ele está AQUI, no popup, e não na barra.
         let agendar = padded_control(
-            toggler(self.chaves.leitura_agenda)
-                .on_toggle(Message::Agendar)
-                .label("Agendar".to_string())
-                .text_size(14)
-                .width(Length::Fill),
+            Row::new()
+                .push(Self::selo(ARTE_HALO))
+                .push(
+                    toggler(self.chaves.leitura_agenda)
+                        .on_toggle(Message::Agendar)
+                        .label("Agendar".to_string())
+                        .text_size(14)
+                        .width(Length::Fill),
+                )
+                .spacing(8)
+                .align_y(Alignment::Center),
         );
 
         let ini = ponta_do_horario(&self.chaves.leitura_hora_inicio, PADRAO_INICIO);
@@ -837,9 +1012,11 @@ impl cosmic::Application for AppletLeitura {
         //
         // A CONTA DA LARGURA, PARA ISTO NÃO QUEBRAR NUMA TOPBAR ESTREITA
         //   O `spin_button` horizontal do libcosmic é [−][rótulo de 48px][+],
-        //   ou seja ~120px com o container. Dois deles (240) mais "das" (~28),
-        //   "às" (~25), três espaços de 8 (24) e o padding do `padded_control`
-        //   (32) dão ~349px — dentro do `max_width(400)` do popup, que é quem
+        //   ou seja ~120px com o container, mais 2px da borda que a `realce`
+        //   desenha por fora (1px de cada lado). Dois deles (244) mais "Das"
+        //   (~28), "Às" (~25), três espaços de 8 (24) e o padding do
+        //   `padded_control` (32) dão ~353px — dentro do `max_width(400)` do
+        //   popup, que é quem
         //   manda no tamanho final.
         //
         // O TETO DOS DOIS É `1440 - PASSO_MINUTO`, E ISSO É A GRADE, NÃO UM
@@ -872,8 +1049,8 @@ impl cosmic::Application for AppletLeitura {
                 Column::new()
                     .push(padded_control(
                         Row::new()
-                            .push(text::body("das"))
-                            .push(spin_button(
+                            .push(text::body("Das"))
+                            .push(realce(spin_button(
                                 hhmm_de_minutos(ini),
                                 "hora de início",
                                 ini,
@@ -881,9 +1058,9 @@ impl cosmic::Application for AppletLeitura {
                                 0,
                                 1440 - PASSO_MINUTO,
                                 Message::HoraInicio,
-                            ))
-                            .push(text::body("às"))
-                            .push(spin_button(
+                            )))
+                            .push(text::body("Às"))
+                            .push(realce(spin_button(
                                 hhmm_de_minutos(fim),
                                 "hora de fim",
                                 fim,
@@ -891,7 +1068,7 @@ impl cosmic::Application for AppletLeitura {
                                 0,
                                 1440 - PASSO_MINUTO,
                                 Message::HoraFim,
-                            ))
+                            )))
                             .spacing(8)
                             .align_y(Alignment::Center),
                     ))
@@ -994,6 +1171,35 @@ fn chave_apenas_ausente(e: &cosmic_config::Error) -> bool {
         cosmic_config::Error::GetKey(_, io) => io.kind() == std::io::ErrorKind::NotFound,
         _ => false,
     }
+}
+
+/// O contorno que separa `[− 18:00 +]` do fundo do popup.
+///
+/// POR QUE ELE PRECISA EXISTIR AQUI, E NÃO SAI DE GRAÇA DO WIDGET
+///   O `spin_button` do libcosmic já se embrulha num container próprio — mas o
+///   `container_style` dele (`src/widget/spin_button.rs`, a `fn container_style`
+///   do rev pinado no nosso Cargo.toml) só desenha borda quando o tema é de ALTO
+///   CONTRASTE. No caminho normal, que é o dela, a largura é `0.0` e o fundo é
+///   `None`: os dois grupos de botões flutuavam sem nada dizendo onde um começa
+///   e o outro acaba. Foi o que ela apontou em 31/08/2026, olhando a barra —
+///   "não conseguimos destacar os botões do agendamento? Talvez uma borda".
+///
+///   E não dá para reestilizar o container de DENTRO: a `class` é cravada pelo
+///   widget na hora de virar `Element` e não há método para trocá-la depois.
+///   Por isso o realce é um SEGUNDO container, por fora — e por isso ele é uma
+///   função com nome, e não uma linha repetida duas vezes lá em cima.
+///
+/// `Container::Dropdown`, E NÃO UMA COR NOSSA
+///   É o estilo que o próprio COSMIC usa em controle embutido em linha: fundo
+///   `bg_component_color()`, borda de 1px em `bg_component_divider()` e o
+///   `radius_s` do tema (`src/theme/style/iced.rs`). Escolher o estilo do tema
+///   em vez de escrever um RGB nosso é o que faz o realce acompanhar o
+///   Catppuccin dela quando ela trocar de sabor, e continuar legível se ela for
+///   para o tema claro. Uma cor chumbada aqui seria bonita hoje e errada no dia
+///   em que ela mudasse de acento — que é o dia em que ninguém lembra deste
+///   arquivo.
+fn realce<'a>(conteudo: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+    container(conteudo).class(theme::Container::Dropdown).into()
 }
 
 fn tarefa_de_superficie(acao: cosmic::surface::Action) -> Task<Action<Message>> {
