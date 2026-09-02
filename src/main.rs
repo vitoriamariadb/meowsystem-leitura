@@ -836,7 +836,7 @@ impl cosmic::Application for AppletLeitura {
         // ERA `night-light-symbolic`, UM ÍCONE DE TEMA, ATÉ 31/08/2026
         //   O comentário que estava aqui dizia que "um ícone autoral entraria
         //   aqui, mas escolher o desenho é gosto dela, e gosto não se decide num
-        //   commit de frente". Estava certo, e o gosto foi decidido: ela viu a
+        //   commit de quem não é a dona". Estava certo, e o gosto foi decidido: ela viu a
         //   folha de 29/08 e aprovou o par sol/lua (`s3` e `r2`), e em 31/08
         //   pediu que o desenho seguisse a hora. É esse par que está aqui.
         //
