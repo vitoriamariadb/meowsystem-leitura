@@ -243,6 +243,18 @@ pub struct Chaves {
     pub leitura_hora_fim: String,
 }
 
+/// O PONTO AO QUAL O INTERRUPTOR VOLTA, COMO O ESTADO O GUARDA — 15/10/2026,
+/// P82 (item 20). O `ultima_*` era lido só ao nascer. O «Salvar e aplicar» do
+/// painel (o `meow leitura adotar`) grava no estado o ponto que ela escolheu
+/// lá, e o interruptor do popup religava no ponto antigo até o applet
+/// reiniciar. A assinatura `watch_state` (ver o `subscription()`) relê.
+#[derive(Clone, Debug, Default, PartialEq, CosmicConfigEntry)]
+#[version = 1]
+pub struct Ponto {
+    pub ultima_temperatura: u32,
+    pub ultima_textura: f32,
+}
+
 impl Default for Chaves {
     fn default() -> Self {
         Self {
@@ -483,6 +495,9 @@ enum Message {
     /// `cosmic::Application` tem de ser `Clone`. Os erros que vinham no
     /// `Update` são consumidos onde nascem — no `map` da assinatura.
     DiscoMudou(Chaves),
+    /// O estado mudou por fora (o `meow leitura adotar`): o ponto ao qual o
+    /// interruptor volta passa a ser o de lá. P82, item 20.
+    EstadoMudou(Ponto),
     /// O relógio bateu. Não carrega nada e não escreve nada: existe só para o
     /// `view()` rodar de novo e o ícone da barra trocar de sol para lua na hora
     /// certa. Ver o `subscription()`.
@@ -786,6 +801,19 @@ impl cosmic::Application for AppletLeitura {
             // Nada a fazer: o retorno desta função já pede um redesenho, e é o
             // redesenho que troca o sol pela lua. Ver o `subscription()`.
             Message::Minuto => {}
+            // O MESMO FILTRO DO NASCIMENTO (ver o `init`): fora de faixa, ou a
+            // chave ausente (o `Default` dá 0), não troca o ponto que já há.
+            // O que veio do disco já está gravado: a guarda do `lembra_ponto`
+            // passa a saber disso, e não regrava o mesmo par.
+            Message::EstadoMudou(p) => {
+                if (PISO..NEUTRO).contains(&p.ultima_temperatura) {
+                    self.ultima_temp = p.ultima_temperatura;
+                }
+                if p.ultima_textura > 0.0 && p.ultima_textura <= 1.0 {
+                    self.ultima_textura = p.ultima_textura;
+                }
+                self.estado_gravado = Some((self.ultima_temp, self.ultima_textura));
+            }
         }
         Task::none()
     }
@@ -829,6 +857,12 @@ impl cosmic::Application for AppletLeitura {
                     Message::DiscoMudou(atualizacao.config)
                 }),
             cosmic::iced::time::every(std::time::Duration::from_secs(60)).map(|_| Message::Minuto),
+            // O TERCEIRO FIO É O ESTADO — P82 (item 20). `watch_state`, porque
+            // o `ultima_*` mora em ~/.local/state; o `meow leitura adotar` o
+            // grava, e o interruptor tem de religar no ponto de lá.
+            self.core
+                .watch_state::<Ponto>(NS_ESTADO)
+                .map(|atualizacao| Message::EstadoMudou(atualizacao.config)),
         ])
     }
 
