@@ -128,7 +128,7 @@ const NS_ESTADO_V: u64 = 1;
 // POR QUE `include_bytes!` E NÃO O TEMA DE ÍCONES
 //   A folha previa instalá-los em `MeowSystem-Icons/scalable/status/`. Esse
 //   diretório tem DONO — o `scripts/icones_sistema.sh`, que o varre contra o
-//   `assets/icones/sistema.map` e REMOVE ÓRFÃO (o cabeçalho dele diz isso em voz alta).
+//   `packs/meowsystem/icones/sistema.map` e REMOVE ÓRFÃO (o cabeçalho dele diz isso em voz alta).
 //   Quatro arquivos nossos ali seriam apagados na próxima passada daquele
 //   script, e o applet ficaria sem ícone sem ninguém ter mexido nele.
 //
@@ -142,10 +142,10 @@ const NS_ESTADO_V: u64 = 1;
 //   chega à tela: com `symbolic`, o libcosmic descarta a cor do arquivo e
 //   repinta com o `on` do fundo — que é o mesmo caminho de todo ícone da barra
 //   dela. É por isso que o mesmo arquivo serve tema claro e escuro.
-const ARTE_LUA: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/r2.svg");
-const ARTE_SOL: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/s3.svg");
-const ARTE_LIVRO: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/r1.svg");
-const ARTE_HALO: &[u8] = include_bytes!("../../../../assets/icones/autorais/leitura/r6.svg");
+const ARTE_LUA: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/r2.svg");
+const ARTE_SOL: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/s3.svg");
+const ARTE_LIVRO: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/r1.svg");
+const ARTE_HALO: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/r6.svg");
 
 /// O tamanho dos ícones que acompanham os rótulos DENTRO do popup. O da barra
 /// não passa por aqui: quem o dimensiona é o `suggested_size` do libcosmic, que
