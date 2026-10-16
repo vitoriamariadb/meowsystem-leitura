@@ -806,13 +806,22 @@ impl cosmic::Application for AppletLeitura {
             // O que veio do disco já está gravado: a guarda do `lembra_ponto`
             // passa a saber disso, e não regrava o mesmo par.
             Message::EstadoMudou(p) => {
-                if (PISO..NEUTRO).contains(&p.ultima_temperatura) {
+                let temp_ok = (PISO..NEUTRO).contains(&p.ultima_temperatura);
+                let textura_ok = p.ultima_textura > 0.0 && p.ultima_textura <= 1.0;
+                if temp_ok {
                     self.ultima_temp = p.ultima_temperatura;
                 }
-                if p.ultima_textura > 0.0 && p.ultima_textura <= 1.0 {
+                if textura_ok {
                     self.ultima_textura = p.ultima_textura;
                 }
-                self.estado_gravado = Some((self.ultima_temp, self.ultima_textura));
+                // Só o par que VEIO DO DISCO conta como gravado. Com uma chave
+                // ausente (a primeira entrega da assinatura numa casa nova traz o
+                // `Default`, 0/0.0), o par em memória é o padrão — o mesmo caso do
+                // `estado_gravado: None` do `init` — e a guarda calaria a
+                // primeira `lembra_ponto()`: o arquivo de estado nunca nasceria.
+                if temp_ok && textura_ok {
+                    self.estado_gravado = Some((self.ultima_temp, self.ultima_textura));
+                }
             }
         }
         Task::none()
