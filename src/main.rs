@@ -43,10 +43,10 @@ const NS_ESTADO_V: u64 = 1;
 // leitura").
 //
 // A folha previa instalá-los em `MeowSystem-Icons/scalable/status/`.
-const ARTE_LUA: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/r2.svg");
-const ARTE_SOL: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/s3.svg");
-const ARTE_LIVRO: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/r1.svg");
-const ARTE_HALO: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura/r6.svg");
+const ARTE_LUA: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura-r2.svg");
+const ARTE_SOL: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura-s3.svg");
+const ARTE_LIVRO: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura-r1.svg");
+const ARTE_HALO: &[u8] = include_bytes!("../../../../packs/meowsystem/icones/sistema/leitura-r6.svg");
 
 /// O tamanho dos ícones que acompanham os rótulos DENTRO do popup. O da barra
 /// não passa por aqui: quem o dimensiona é o `suggested_size` do libcosmic, que
