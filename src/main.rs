@@ -841,3 +841,45 @@ fn main() -> cosmic::iced::Result {
     cosmic::applet::run::<AppletLeitura>(())
 }
 
+// O filtro do horário é o contrato com o `scripts/leitura.sh` do MeowSystem: os
+// dois têm de aceitar e recusar as mesmas palavras.
+#[cfg(test)]
+mod testes {
+    use super::*;
+
+    #[test]
+    fn hhmm_aceita_as_duas_formas_do_shell() {
+        assert_eq!(minutos_de_hhmm("18:00"), Some(1080));
+        assert_eq!(minutos_de_hhmm("7:05"), Some(425));
+        assert_eq!(minutos_de_hhmm("1080"), Some(1080));
+        assert_eq!(minutos_de_hhmm("0"), Some(0));
+        assert_eq!(minutos_de_hhmm("1439"), Some(1439));
+    }
+
+    #[test]
+    fn hhmm_recusa_o_que_o_case_do_shell_recusa() {
+        for v in ["018:00", "18:0", "18: 00", "+1:00", "24:00", "23:60", "", "1440", "-5", "+5", "9999999999"] {
+            assert_eq!(minutos_de_hhmm(v), None, "{v:?}");
+        }
+    }
+
+    #[test]
+    fn ponta_invalida_cai_no_padrao() {
+        assert_eq!(ponta_do_horario(" 19:30 ", PADRAO_INICIO), 1170);
+        assert_eq!(ponta_do_horario("lixo", PADRAO_INICIO), 1080);
+        assert_eq!(ponta_do_horario("lixo", PADRAO_FIM), 420);
+    }
+
+    #[test]
+    fn minutos_voltam_a_hhmm_dando_a_volta_no_dia() {
+        assert_eq!(hhmm_de_minutos(1080), "18:00");
+        assert_eq!(hhmm_de_minutos(1440 + 15), "00:15");
+        assert_eq!(hhmm_de_minutos(-15), "23:45");
+    }
+
+    #[test]
+    fn o_estado_segue_o_app_id_novo() {
+        assert_eq!(ID, "io.github.meowsystem.Leitura");
+        assert_eq!(NS_ESTADO, ID);
+    }
+}
