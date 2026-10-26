@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Modo de leitura
+Comment=Temperatura de cor e textura de papel, do MeowSystem
+Exec=@bindir@/meowsystem-leitura
+Terminal=false
+Type=Application
+StartupNotify=true
+Icon=night-light-symbolic
+Categories=COSMIC;Utility;
+Keywords=COSMIC;Applet;Leitura;Temperatura;Noite;
+NoDisplay=true
+X-CosmicApplet=true
+X-CosmicShrinkable=true
