@@ -1,4 +1,4 @@
-// meow-applet-leitura — os dois sliders do modo de leitura, na topbar dela.
+// meowsystem-leitura — os dois sliders do modo de leitura, na topbar dela.
 //
 // Desenha um ícone na barra; clicando, abre um popup com um interruptor, dois
 // sliders (Temperatura em Kelvin, Textura em por cento) e um agendamento com
@@ -22,7 +22,7 @@ use cosmic::{Action, Element, Task};
 /// O `app_id` do applet. É o basename do `.desktop` que o `cosmic-panel` procura
 /// e a palavra que entra no `plugins_wings` — os três TÊM de ser iguais, e é por
 /// isso que a constante existe em vez de a string ser repetida.
-const ID: &str = "com.meowsystem.AppletLeitura";
+const ID: &str = "io.github.meowsystem.Leitura";
 
 /// O namespace das chaves do compositor. Não é nosso: é o do `cosmic-comp`, e
 /// nós só acrescentamos cinco arquivos a ele (docs/FRONTEIRA.md).
@@ -31,8 +31,9 @@ const NS_COMPOSITOR_V: u64 = 1;
 
 /// O nosso próprio estado, em `~/.local/state/cosmic/`. Guarda só a última
 /// temperatura e a última textura NÃO NULAS, para o interruptor "Modo de
-/// leitura" saber ao que voltar.
-const NS_ESTADO: &str = "com.meowsystem.AppletLeitura";
+/// leitura" saber ao que voltar. Segue o app id, para conviver com o applet
+/// antigo do MeowSystem (`com.meowsystem.AppletLeitura`) sem dividir estado.
+const NS_ESTADO: &str = ID;
 const NS_ESTADO_V: u64 = 1;
 
 //   "faltou inserir os svgs na guia que abre e fazer o icon do applet mudar
@@ -283,7 +284,7 @@ impl AppletLeitura {
         match self.conf.as_ref() {
             Some(c) => {
                 if let Err(e) = self.chaves.set_leitura_temperatura(c, v) {
-                    eprintln!("meow-applet-leitura: leitura_temperatura: {e}");
+                    eprintln!("meowsystem-leitura: leitura_temperatura: {e}");
                 }
             }
             None => self.chaves.leitura_temperatura = v,
@@ -294,7 +295,7 @@ impl AppletLeitura {
         match self.conf.as_ref() {
             Some(c) => {
                 if let Err(e) = self.chaves.set_leitura_textura(c, v) {
-                    eprintln!("meow-applet-leitura: leitura_textura: {e}");
+                    eprintln!("meowsystem-leitura: leitura_textura: {e}");
                 }
             }
             None => self.chaves.leitura_textura = v,
@@ -448,7 +449,7 @@ impl cosmic::Application for AppletLeitura {
             Message::Agendar(v) => {
                 if let Some(c) = self.conf.as_ref() {
                     if let Err(e) = self.chaves.set_leitura_agenda(c, v) {
-                        eprintln!("meow-applet-leitura: leitura_agenda: {e}");
+                        eprintln!("meowsystem-leitura: leitura_agenda: {e}");
                     }
                 } else {
                     self.chaves.leitura_agenda = v;
@@ -458,7 +459,7 @@ impl cosmic::Application for AppletLeitura {
                 let hhmm = hhmm_de_minutos(m);
                 if let Some(c) = self.conf.as_ref() {
                     if let Err(e) = self.chaves.set_leitura_hora_inicio(c, hhmm) {
-                        eprintln!("meow-applet-leitura: leitura_hora_inicio: {e}");
+                        eprintln!("meowsystem-leitura: leitura_hora_inicio: {e}");
                     }
                 } else {
                     self.chaves.leitura_hora_inicio = hhmm;
@@ -468,7 +469,7 @@ impl cosmic::Application for AppletLeitura {
                 let hhmm = hhmm_de_minutos(m);
                 if let Some(c) = self.conf.as_ref() {
                     if let Err(e) = self.chaves.set_leitura_hora_fim(c, hhmm) {
-                        eprintln!("meow-applet-leitura: leitura_hora_fim: {e}");
+                        eprintln!("meowsystem-leitura: leitura_hora_fim: {e}");
                     }
                 } else {
                     self.chaves.leitura_hora_fim = hhmm;
@@ -524,7 +525,7 @@ impl cosmic::Application for AppletLeitura {
                 .map(|atualizacao| {
                     for e in &atualizacao.errors {
                         if !chave_apenas_ausente(e) {
-                            eprintln!("meow-applet-leitura: lendo o disco: {e}");
+                            eprintln!("meowsystem-leitura: lendo o disco: {e}");
                         }
                     }
                     Message::DiscoMudou(atualizacao.config)
@@ -744,7 +745,7 @@ impl AppletLeitura {
             return tarefa_de_superficie(destroy_popup(popup));
         }
         let Some(pai) = self.core.main_window_id() else {
-            eprintln!("meow-applet-leitura: sem janela principal — popup não abre");
+            eprintln!("meowsystem-leitura: sem janela principal — popup não abre");
             return Task::none();
         };
 
@@ -839,3 +840,4 @@ const MARCADOR: &[u8] = b"AURORA-READING-MODE";
 fn main() -> cosmic::iced::Result {
     cosmic::applet::run::<AppletLeitura>(())
 }
+

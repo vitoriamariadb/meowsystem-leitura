@@ -1,25 +1,22 @@
-# meow-applet-leitura — o applet do modo de leitura na topbar do COSMIC.
+# meowsystem-leitura — o applet do modo de leitura na topbar do COSMIC.
 #
-# O `rev` DO libcosmic É PINADO AQUI, E O `Cargo.lock` VAI NO REPOSITÓRIO O
-# applet de mídia (src/applets/now-playing) herda o lock do upstream dele e por
-# isso pode apontar o libcosmic para o git sem `rev`.
-#
-# A versão do Cargo.toml deles não distingue nada; só o commit distingue.
-#
-# `1f6dc99` é EXATAMENTE o que o applet de mídia compilou nesta máquina (ver o
-# campo LIBCOSMIC do src/applets/now-playing/PINO).
+# O `rev` do libcosmic é pinado aqui e o `Cargo.lock` vai no repositório: a
+# versão do Cargo.toml do libcosmic não distingue nada, só o commit distingue.
+# `1f6dc99` é o que o painel do COSMIC desta máquina aceitou; quem segue o
+# libcosmic do painel instalado troca o `rev` numa cópia (ver INTEGRACAO.md).
 #
 # `default-features = false` mais `a11y`, `applet` e `wayland`.
 [package]
-name = "meow-applet-leitura"
+name = "meowsystem-leitura"
 version = "0.1.0"
 edition = "2024"
 license = "GPL-3.0"
 rust-version = "1.93"
 publish = false
+repository = "https://github.com/vitoriamariadb/meowsystem-leitura"
 
 [[bin]]
-name = "meow-applet-leitura"
+name = "meowsystem-leitura"
 path = "src/main.rs"
 
 # O `jiff` JÁ ESTAVA NESTA ÁRVORE — declará-lo aqui não baixa um byte Ele entra
@@ -38,8 +35,6 @@ rev = "1f6dc991eaa5115a09be2505cc8a323e5b2b0bff"
 default-features = false
 features = ["a11y", "applet", "wayland"]
 
-# Um binário de applet que só desenha não precisa de símbolo nenhum, e o
-# `midia_build.sh` já roda `strip` depois de instalar. Aqui o `strip = true` faz
-# o mesmo de graça, dentro do próprio cargo.
+# Um binário de applet que só desenha não precisa de símbolo nenhum.
 [profile.release]
 strip = true

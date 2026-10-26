@@ -3011,7 +3011,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "meow-applet-leitura"
+name = "meowsystem-leitura"
 version = "0.1.0"
 dependencies = [
  "jiff",
