@@ -74,6 +74,8 @@ os dois applets conviverem nesta máquina sem dividir estado.
 
 ## Tema
 
-O applet segue o tema do COSMIC: `cosmic::applet::style()`, o `popup_container` do libcosmic e os
-desenhos `symbolic`, repintados com a cor do tema. O MeowSystem não precisa escrever nada para
-este applet: o tema que ele já aplica ao COSMIC basta.
+O contrato dos outros applets do MeowSystem: o applet lê
+`~/.config/meowsystem/extensoes/io.github.meowsystem.Leitura/tema.conf` ao subir e a cada vez que
+o popup abre. No pino: `TEMA="io.github.meowsystem.Leitura"` e
+`TEMA_CHAVES="acento:@acento destaque:base fundo:base borda:surface1 texto:text bloco:surface0"`.
+Sem o arquivo, vale o tema do COSMIC.

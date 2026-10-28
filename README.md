@@ -60,8 +60,11 @@ mudar uma delas, a interface acompanha.
 ## Tema
 
 O applet usa o estilo de applet do libcosmic e repinta os quatro desenhos (`data/icones/`) com
-a cor do tema do COSMIC (`symbolic`). O tema que o MeowSystem aplica vale aqui sem nenhuma linha
-a mais. Os desenhos são cópia dos `leitura-*.svg` de `packs/meowsystem/icones/sistema/`.
+a cor do tema (`symbolic`). Quando o theme pack traz
+`~/.config/meowsystem/extensoes/io.github.meowsystem.Leitura/tema.conf` (ou `$MEOWSYSTEM_TEMA`),
+as cores dele valem por cima do COSMIC: `acento` nos interruptores ligados e nos sliders,
+`destaque` sobre o acento, `fundo`, `borda`, `texto` e `bloco` no popup. Linhas
+`chave = #rrggbb`; sem o arquivo, vale o tema do COSMIC. Os desenhos são cópia dos `leitura-*.svg` de `packs/meowsystem/icones/sistema/`.
 
 ## Licença
 
