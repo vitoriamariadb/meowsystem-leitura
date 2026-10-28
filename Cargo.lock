@@ -3012,10 +3012,11 @@ dependencies = [
 
 [[package]]
 name = "meowsystem-leitura"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jiff",
  "libcosmic",
+ "serde_json",
 ]
 
 [[package]]
