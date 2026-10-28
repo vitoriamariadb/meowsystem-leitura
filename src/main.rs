@@ -9,6 +9,8 @@
 // struct `CosmicCompConfig` do patch, conferidos linha a linha em
 // `patches/cosmic-comp-modo-leitura.patch`.
 
+mod tema;
+
 use cosmic::app::Core;
 use cosmic::applet::padded_control;
 use cosmic::cosmic_config::cosmic_config_derive::CosmicConfigEntry;
@@ -18,6 +20,7 @@ use cosmic::surface::action::{app_popup, destroy_popup};
 use cosmic::theme;
 use cosmic::widget::{Column, Row, Slider, container, divider, icon, spin_button, text, toggler};
 use cosmic::{Action, Element, Task};
+use tema::Tema;
 
 /// O `app_id` do applet. É o basename do `.desktop` que o `cosmic-panel` procura
 /// e a palavra que entra no `plugins_wings` — os três TÊM de ser iguais, e é por
@@ -211,6 +214,7 @@ struct AppletLeitura {
     /// A sonda lê 33 MB de binário do disco; o `view_window` é chamado a cada
     /// quadro do arrasto.
     compositor_le: bool,
+    tema: Tema,
 }
 
 #[derive(Clone, Debug)]
@@ -371,8 +375,7 @@ impl cosmic::Application for AppletLeitura {
             .filter(|v| *v > 0.0 && *v <= 1.0)
             .unwrap_or(PADRAO_TEXTURA);
 
-        (
-            Self {
+        let applet = Self {
                 core,
                 popup: None,
                 chaves,
@@ -387,9 +390,10 @@ impl cosmic::Application for AppletLeitura {
                 // ausente, ilegível ou fora de faixa).
                 estado_gravado: None,
                 compositor_le: compositor_vivo_le_as_chaves(),
-            },
-            Task::none(),
-        )
+                tema: Tema::load(ID),
+            };
+        let cores = applet.aplicar_tema(cosmic::theme::active().cosmic().is_dark, false);
+        (applet, cores)
     }
 
     fn on_close_requested(&self, id: window::Id) -> Option<Message> {
@@ -737,9 +741,43 @@ impl cosmic::Application for AppletLeitura {
     fn style(&self) -> Option<cosmic::iced::theme::Style> {
         Some(cosmic::applet::style())
     }
+
+    fn system_theme_update(
+        &mut self,
+        _keys: &[&'static str],
+        novo: &cosmic::cosmic_theme::Theme,
+    ) -> Task<Action<Self::Message>> {
+        self.aplicar_tema(novo.is_dark, false)
+    }
+
+    fn system_theme_mode_update(
+        &mut self,
+        _keys: &[&'static str],
+        modo: &cosmic::cosmic_theme::ThemeMode,
+    ) -> Task<Action<Self::Message>> {
+        self.aplicar_tema(modo.is_dark, false)
+    }
 }
 
 impl AppletLeitura {
+    fn aplicar_tema(&self, escuro: bool, antes: bool) -> Task<Action<Message>> {
+        match self.tema.cosmic(escuro) {
+            Some(t) => cosmic::command::set_theme(t),
+            None if antes => cosmic::command::set_theme(self.core.system_theme().clone()),
+            None => Task::none(),
+        }
+    }
+
+    fn reler_tema(&mut self) -> Task<Action<Message>> {
+        let novo = Tema::load(ID);
+        if novo == self.tema {
+            return Task::none();
+        }
+        let antes = self.tema.cosmic(true).is_some();
+        self.tema = novo;
+        self.aplicar_tema(cosmic::theme::active().cosmic().is_dark, antes)
+    }
+
     fn abre_fecha(&mut self) -> Task<Action<Message>> {
         if let Some(popup) = self.popup.take() {
             return tarefa_de_superficie(destroy_popup(popup));
@@ -749,7 +787,8 @@ impl AppletLeitura {
             return Task::none();
         };
 
-        tarefa_de_superficie(app_popup::<AppletLeitura>(
+        let cores = self.reler_tema();
+        let abrir = tarefa_de_superficie(app_popup::<AppletLeitura>(
             |_| Default::default(),
             move |estado: &mut AppletLeitura| {
                 let popup = Id::unique();
@@ -768,7 +807,8 @@ impl AppletLeitura {
                 ajustes
             },
             None,
-        ))
+        ));
+        Task::batch([cores, abrir])
     }
 }
 
